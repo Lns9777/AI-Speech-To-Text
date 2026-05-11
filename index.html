@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Text to Speech</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f5f7fb;
+            --panel: #ffffff;
+            --ink: #18202f;
+            --muted: #667085;
+            --line: #d9e0ea;
+            --primary: #1769e0;
+            --primary-dark: #0f53b5;
+            --accent: #15957b;
+            --danger: #b42318;
+            --shadow: 0 18px 50px rgba(24, 32, 47, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--ink);
+            background:
+                linear-gradient(135deg, rgba(21, 149, 123, 0.16), transparent 34%),
+                linear-gradient(315deg, rgba(23, 105, 224, 0.18), transparent 36%),
+                var(--bg);
+        }
+
+        main {
+            width: min(1040px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 42px 0;
+        }
+
+        .app-shell {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) 340px;
+            gap: 22px;
+            align-items: stretch;
+        }
+
+        .workspace,
+        .output {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(217, 224, 234, 0.9);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        .workspace {
+            padding: 28px;
+        }
+
+        .output {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: clamp(2rem, 4vw, 3.8rem);
+            line-height: 1;
+            letter-spacing: 0;
+        }
+
+        .subtitle {
+            margin: 0 0 28px;
+            max-width: 680px;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+            color: #263244;
+        }
+
+        textarea,
+        select {
+            width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fff;
+            color: var(--ink);
+            font: inherit;
+            outline: none;
+            transition: border-color 150ms ease, box-shadow 150ms ease;
+        }
+
+        textarea {
+            min-height: 320px;
+            resize: vertical;
+            padding: 16px;
+            line-height: 1.55;
+        }
+
+        select {
+            height: 44px;
+            padding: 0 12px;
+        }
+
+        textarea:focus,
+        select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(23, 105, 224, 0.13);
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .style-note {
+            min-height: 46px;
+            margin-top: 12px;
+            padding: 11px 13px;
+            border: 1px solid #cdd8e8;
+            border-radius: 8px;
+            background: #f8fbff;
+            color: #475467;
+            font-size: 0.9rem;
+            line-height: 1.45;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 22px;
+            align-items: center;
+        }
+
+        button,
+        .download {
+            min-height: 46px;
+            border: 0;
+            border-radius: 8px;
+            padding: 0 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font: inherit;
+            font-weight: 800;
+            text-decoration: none;
+            cursor: pointer;
+            transition: transform 140ms ease, background 140ms ease, opacity 140ms ease;
+        }
+
+        button {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        button:hover,
+        .download:hover {
+            transform: translateY(-1px);
+        }
+
+        button:disabled,
+        .download[aria-disabled="true"] {
+            opacity: 0.48;
+            pointer-events: none;
+            transform: none;
+        }
+
+        button:hover {
+            background: var(--primary-dark);
+        }
+
+        .secondary {
+            background: #eef4ff;
+            color: var(--primary-dark);
+        }
+
+        .secondary:hover {
+            background: #dbe9ff;
+        }
+
+        .download {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .status {
+            min-height: 24px;
+            margin-top: 16px;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .status.error {
+            color: var(--danger);
+        }
+
+        .meter {
+            height: 8px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: #e7edf5;
+        }
+
+        .meter span {
+            display: block;
+            width: 0;
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transition: width 200ms ease;
+        }
+
+        .output h2 {
+            margin: 0;
+            font-size: 1.25rem;
+        }
+
+        audio {
+            width: 100%;
+        }
+
+        .stat {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            padding: 12px 0;
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+        }
+
+        .stat strong {
+            color: var(--ink);
+        }
+
+        @media (max-width: 860px) {
+            main {
+                width: min(100% - 24px, 680px);
+                padding: 24px 0;
+            }
+
+            .app-shell {
+                grid-template-columns: 1fr;
+            }
+
+            .workspace,
+            .output {
+                padding: 20px;
+            }
+
+            textarea {
+                min-height: 240px;
+            }
+
+            .controls {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 560px) {
+            .controls {
+                grid-template-columns: 1fr;
+            }
+
+            button,
+            .download {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>AI Text to Speech</h1>
+        <p class="subtitle">Paste your text, choose a voice and speaking style, generate the audio, then play it here or download the WAV file.</p>
+
+        <section class="app-shell" aria-label="Text to speech generator">
+            <div class="workspace">
+                <label for="textInput">Text</label>
+                <textarea id="textInput" placeholder="Type or paste the complete text you want to hear..."></textarea>
+
+                <div class="controls">
+                    <div>
+                        <label for="voiceSelect">Voice</label>
+                        <select id="voiceSelect">
+                            <option value="Zephyr">Zephyr -- Bright</option>
+                            <option value="Puck">Puck -- Upbeat</option>
+                            <option value="Charon">Charon -- Informative</option>
+
+                            <option value="Kore">Kore -- Firm</option>
+                            <option value="Fenrir">Fenrir -- Excitable</option>
+                            <option value="Leda">Leda -- Youthful</option>
+
+                            <option value="Orus">Orus -- Firm</option>
+                            <option value="Aoede">Aoede -- Breezy</option>
+                            <option value="Callirrhoe">Callirrhoe -- Easy-going</option>
+
+                            <option value="Autonoe">Autonoe -- Bright</option>
+                            <option value="Enceladus">Enceladus -- Breathy</option>
+                            <option value="Iapetus">Iapetus -- Clear</option>
+
+                            <option value="Umbriel">Umbriel -- Easy-going</option>
+                            <option value="Algieba">Algieba -- Smooth</option>
+                            <option value="Despina">Despina -- Smooth</option>
+
+                            <option value="Erinome">Erinome -- Clear</option>
+                            <option value="Algenib">Algenib -- Gravelly</option>
+                            <option value="Rasalgethi">Rasalgethi -- Informative</option>
+
+                            <option value="Laomedeia">Laomedeia -- Upbeat</option>
+                            <option value="Achernar">Achernar -- Soft</option>
+                            <option value="Alnilam">Alnilam -- Firm</option>
+
+                            <option value="Schedar">Schedar -- Even</option>
+                            <option value="Gacrux">Gacrux -- Mature</option>
+                            <option value="Pulcherrima">Pulcherrima -- Forward</option>
+
+                            <option value="Achird">Achird -- Friendly</option>
+                            <option value="Zubenelgenubi">Zubenelgenubi -- Casual</option>
+                            <option value="Vindemiatrix">Vindemiatrix -- Gentle</option>
+
+                            <option value="Sadachbia">Sadachbia -- Lively</option>
+                            <option value="Sadaltager">Sadaltager -- Knowledgeable</option>
+                            <option value="Sulafat">Sulafat -- Warm</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="styleSelect">Speaking style</label>
+                        <select id="styleSelect">
+                            <option value="natural">Natural</option>
+                            <option value="storytelling">Storytelling</option>
+                            <option value="news_reporter">News reporter</option>
+                            <option value="poem_reader">Poem reader</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="languageSelect">Language</label>
+                        <select id="languageSelect">
+                            <option value="en-US">English (US)</option>
+                            <option value="en-IN">English (India)</option>
+                            <option value="hi-IN">Hindi</option>
+                            <option value="ta-IN">Tamil</option>
+                            <option value="te-IN">Telugu</option>
+                            <option value="ml-IN">Malayalam</option>
+                            <option value="kn-IN">Kannada</option>
+                            <option value="mr-IN">Marathi</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="style-note" id="stylePrompt"></div>
+
+                <div class="actions">
+                    <button id="generateButton" type="button">Generate Audio</button>
+                    <button id="clearButton" class="secondary" type="button">Clear</button>
+                </div>
+                <div id="status" class="status">Ready</div>
+                <div class="meter" aria-hidden="true"><span id="progressBar"></span></div>
+            </div>
+
+            <aside class="output">
+                <h2>Generated Audio</h2>
+                <audio id="audioPlayer" controls></audio>
+                <a id="downloadLink" class="download" href="#" download="generated-speech.wav" aria-disabled="true">Download WAV</a>
+                <div class="stat"><span>Characters</span><strong id="charCount">0</strong></div>
+                <div class="stat"><span>Audio size</span><strong id="audioSize">-</strong></div>
+                <div class="stat"><span>State</span><strong id="stateLabel">Idle</strong></div>
+            </aside>
+        </section>
+    </main>
+
+    <script>
+        const textInput = document.getElementById("textInput");
+        const voiceSelect = document.getElementById("voiceSelect");
+        const styleSelect = document.getElementById("styleSelect");
+        const stylePrompt = document.getElementById("stylePrompt");
+        const languageSelect = document.getElementById("languageSelect");
+        const generateButton = document.getElementById("generateButton");
+        const clearButton = document.getElementById("clearButton");
+        const audioPlayer = document.getElementById("audioPlayer");
+        const downloadLink = document.getElementById("downloadLink");
+        const statusLabel = document.getElementById("status");
+        const progressBar = document.getElementById("progressBar");
+        const charCount = document.getElementById("charCount");
+        const audioSize = document.getElementById("audioSize");
+        const stateLabel = document.getElementById("stateLabel");
+
+        let currentAudioUrl = "";
+
+        const stylePrompts = {
+            natural: "realistic conversational voice with clear pronunciation, subtle emotion, comfortable pacing, and human-like pauses",
+            storytelling: "warm audiobook storyteller voice with expressive emphasis, vivid pacing, and immersive natural pauses",
+            news_reporter: "professional news reporter voice with confident broadcast cadence, crisp articulation, and neutral authority",
+            poem_reader: "thoughtful poetry reader voice with lyrical cadence, expressive pauses, and soft emotional shading",
+        };
+
+        const languageNames = {
+            "en-US": "English (US)",
+            "en-IN": "English (India)",
+            "hi-IN": "Hindi",
+            "ta-IN": "Tamil",
+            "te-IN": "Telugu",
+            "ml-IN": "Malayalam",
+            "kn-IN": "Kannada",
+            "mr-IN": "Marathi",
+        };
+
+        function setStatus(message, isError = false) {
+            statusLabel.textContent = message;
+            statusLabel.classList.toggle("error", isError);
+            stateLabel.textContent = isError ? "Error" : message;
+        }
+
+        function setBusy(isBusy) {
+            generateButton.disabled = isBusy;
+            progressBar.style.width = isBusy ? "72%" : "0";
+            if (isBusy) {
+                setStatus("Generating...");
+            }
+        }
+
+        function resetAudio() {
+            if (currentAudioUrl) {
+                URL.revokeObjectURL(currentAudioUrl);
+                currentAudioUrl = "";
+            }
+            audioPlayer.removeAttribute("src");
+            audioPlayer.load();
+            downloadLink.href = "#";
+            downloadLink.setAttribute("aria-disabled", "true");
+            audioSize.textContent = "-";
+        }
+
+        function formatBytes(bytes) {
+            if (!bytes) return "-";
+            const units = ["B", "KB", "MB"];
+            let size = bytes;
+            let unit = 0;
+            while (size >= 1024 && unit < units.length - 1) {
+                size /= 1024;
+                unit += 1;
+            }
+            return `${size.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+        }
+
+        textInput.addEventListener("input", () => {
+            charCount.textContent = textInput.value.length.toLocaleString();
+        });
+
+        function updateStylePrompt() {
+            const style = stylePrompts[styleSelect.value] || stylePrompts.natural;
+            const language = languageNames[languageSelect.value] || languageSelect.value;
+            stylePrompt.textContent = `Prompt: speak in ${language}. If the text is in another language, translate it naturally first, then use a ${style}.`;
+        }
+
+        styleSelect.addEventListener("change", updateStylePrompt);
+        languageSelect.addEventListener("change", updateStylePrompt);
+        updateStylePrompt();
+
+        clearButton.addEventListener("click", () => {
+            textInput.value = "";
+            charCount.textContent = "0";
+            resetAudio();
+            setStatus("Ready");
+        });
+
+        generateButton.addEventListener("click", async () => {
+            const text = textInput.value.trim();
+            if (!text) {
+                setStatus("Please enter text first.", true);
+                textInput.focus();
+                return;
+            }
+
+            resetAudio();
+            setBusy(true);
+
+            try {
+                const response = await fetch("/api/tts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        text,
+                        voice: voiceSelect.value,
+                        speaking_style: styleSelect.value,
+                        language_code: languageSelect.value,
+                    }),
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.detail || "Unable to generate audio.");
+                }
+
+                const blob = await response.blob();
+                currentAudioUrl = URL.createObjectURL(blob);
+                audioPlayer.src = currentAudioUrl;
+                downloadLink.href = currentAudioUrl;
+                downloadLink.removeAttribute("aria-disabled");
+                audioSize.textContent = formatBytes(blob.size);
+                progressBar.style.width = "100%";
+                setStatus("Complete");
+
+                await audioPlayer.play().catch(() => {
+                    setStatus("Complete. Press play to listen.");
+                });
+            } catch (error) {
+                resetAudio();
+                setStatus(error.message, true);
+            } finally {
+                generateButton.disabled = false;
+                setTimeout(() => {
+                    if (!generateButton.disabled) {
+                        progressBar.style.width = "0";
+                    }
+                }, 800);
+            }
+        });
+    </script>
+</body>
+</html>
